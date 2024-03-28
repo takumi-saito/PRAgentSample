@@ -1,0 +1,63 @@
+name: PR-Agent CI
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  pr_agent:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Run PR Agent
+    if: ${{ github.event.sender.type != 'Bot' }}
+    env:
+      COMMON_INSTRUCTIONS: >-
+        - 日本語で回答してください
+        - 以下の観点で指摘を分類してください
+          - Design
+            - 単一責任の原則違反、密結合、低凝集などの設計的な指摘
+          - Simplicity
+            - 不要なコード、冗長なコード、複雑なコードなどのシンプルさに関する指摘
+          - Naming
+            - 変数名、メソッド名、クラス名などの命名が内容に相応しいかどうかの指摘
+          - Style
+            - インデント、改行、スペース、コメントなどのコードスタイルに関する指摘
+          - Functionality
+            - 実装されたコードが期待した挙動になるか、コードに不備がないか
+          - Test
+            - テストが適切に書かれているか、テストカバレッジが適切か
+          - Document
+            - コードに対する説明が適切かどうか
+        - 上記の指摘観点をCategory欄に記載すること
+        - 上記の指摘観点をprefixに付けること。Design観点の場合はコメントにDesign:とprefixを付けること
+    steps:
+      - id: pr-agent
+        uses: Codium-ai/pr-agent@main
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTION.AUTO_DESCRIBE: true
+          GITHUB_ACTION.AUTO_REVIEW: true
+          GITHUB_ACTION.AUTO_IMPROVE: false
+          # レビュー総評コメントである "PR Feedback" への追加プロンプト
+          PR_REVIEWER.EXTRA_INSTRUCTIONS: ${{ env.COMMON_INSTRUCTIONS }}
+          # プルリクの要約 "PR Descrition" に関する追加プロンプト
+          PR_DESCRIPTION.EXTRA_INSTRUCTIONS: >-
+            日本語で回答してください。
+            タイトルは feat: 、chore: 、test: 、fix: 、ci: 、docs: などの
+            commitlint パターンの接頭辞を含む必要があります。
+          # /improve で呼び出す修正コードの "Suggestion" 時の追加プロンプト
+          PR_CODE_SUGGESTIONS.EXTRA_INSTRUCTIONS: ${{ env.COMMON_INSTRUCTIONS }}
+          # /improve コメントの後に提案されるコードの数
+          PR_CODE_SUGGESTIONS.NUM_CODE_SUGGESTIONS: 2
+          # Model指定
+          CONFIG.MODEL: gpt-4-1106-preview
